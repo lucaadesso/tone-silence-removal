@@ -79,14 +79,14 @@ def main(input_video, output_file, freq):
     # Estrai l'audio dal video
     video = VideoFileClip(input_video)
     audio =  AudioSegment.from_file(input_video)
+    print("estratto audio dal video")
 
     # Trova i segmenti con toni sinusoidali a 1000 Hz
     tone_segments = find_tone_segments(audio, target_freq=freq, threshold=1e6)
-    silence = find_silence(audio)
+    silence = [] # find_silence(audio)
     tone_segments += silence
     merged = sorted(set(tone_segments))
     merged = [(start /1000, stop /1000 ) for start , stop in merged]
-#    print(merged)
     segmenti_attivi = []
     inizio = 0
 
@@ -97,12 +97,18 @@ def main(input_video, output_file, freq):
             clip = clip.audio_fadein(0.1).audio_fadeout(0.1)
             segmenti_attivi.append(clip)
         inizio = stop
+    print(merged)
+    print(inizio)
+    print(video.duration)
     # Aggiungi l'ultimo segmento se esiste qualcosa dopo l'ultimo intervallo silenzioso
-    if inizio < video.duration:
-        clip = video.subclip(inizio, video.duration)
+#    if 1 <= inizio < video.duration:
+    if inizio < video.duration and abs(video.duration - inizio) >= 1:
+        # clip = video.subclip(inizio, video.duration)
+        clip = video.subclip(inizio, min(video.duration, inizio))
         clip = clip.audio_fadein(0.1).audio_fadeout(0.1)
         segmenti_attivi.append(clip)
     # Concatenazione dei segmenti attivi
+    print("concateno i segmenti attivi")
     video_finale = concatenate_videoclips(segmenti_attivi)
     video_finale.write_videofile(output_file, codec="h264_nvenc", audio_codec="aac")
     video_finale.close()

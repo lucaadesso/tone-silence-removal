@@ -46,7 +46,7 @@ def find_tone_segments(audio, target_freq=5000, threshold=0.1, chunk_size=100):
 
     return tone_segments
 
-def find_silence(audio, silence_len=750, silence_thresh=-80):
+def find_silence(audio, silence_len=1250, silence_thresh=-80):
     """
     Trova segmenti di silenzio in un audio.
 
@@ -87,7 +87,7 @@ def main(input_file, output_file, freq):
     
     # Trova i segmenti con toni sinusoidali e silenzi
     tone_segments = find_tone_segments(audio, target_freq=freq, threshold=1e6)
-    silence_segments = find_silence(audio)
+    silence_segments = [] # find_silence(audio)
     all_segments = sorted(set(tone_segments + silence_segments))
     
     # Elabora il file in base al tipo
