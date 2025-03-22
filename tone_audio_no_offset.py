@@ -75,50 +75,74 @@ def find_silence(audio, silence_len=1250, silence_thresh=-80):
 
     return dead_time
 
-def main(input_video, output_file, freq):
-    # Estrai l'audio dal video
-    video = VideoFileClip(input_video)
-    audio =  AudioSegment.from_file(input_video)
-    print("estratto audio dal video")
-
-    # Trova i segmenti con toni sinusoidali a 1000 Hz
+def main(input_file, output_file, freq):
+    # Determina se il file è un video o un audio
+    try:
+        video = VideoFileClip(input_file)
+        is_video = True
+        audio = AudioSegment.from_file(input_file)
+    except Exception:
+        is_video = False
+        audio = AudioSegment.from_file(input_file)
+    
+    # Trova i segmenti con toni sinusoidali e silenzi
     tone_segments = find_tone_segments(audio, target_freq=freq, threshold=1e6)
-    silence = [] # find_silence(audio)
-    tone_segments += silence
-    merged = sorted(set(tone_segments))
-    merged = [(start /1000, stop /1000 ) for start , stop in merged]
-    segmenti_attivi = []
+    silence_segments = [] # find_silence(audio)
+    all_segments = sorted(set(tone_segments + silence_segments))
+    
+    # Elabora il file in base al tipo
+    if is_video:
+        process_video(video, all_segments, output_file)
+    else:
+        process_audio(audio, all_segments, output_file)
+
+def process_video(video, segments, output_file):
+    """Processa un file video rimuovendo segmenti specifici."""
+    segments = [(start / 1000, stop / 1000) for start, stop in segments]  # Converti in secondi
+    active_segments = []
     inizio = 0
 
-    for start, stop in merged:
-	# Aggiungi il segmento attivo prima dell'intervallo di silenzio
+    for start, stop in segments:
+        # Aggiungi il segmento attivo prima dell'intervallo di silenzio
         if inizio < start:
             clip = video.subclip(inizio, start)
-            clip = clip.audio_fadein(0.05).audio_fadeout(0.05)
-            segmenti_attivi.append(clip)
+            clip = clip.audio_fadein(0.1).audio_fadeout(0.1)
+            active_segments.append(clip)
         inizio = stop
-    print(merged)
-    print(inizio)
-    print(video.duration)
-    # Aggiungi l'ultimo segmento se esiste qualcosa dopo l'ultimo intervallo silenzioso
-#    if 1 <= inizio < video.duration:
-    if inizio < video.duration and abs(video.duration - inizio) >= 1:
-        # clip = video.subclip(inizio, video.duration)
-        clip = video.subclip(inizio, min(video.duration, inizio))
+    
+    # Aggiungi l'ultimo segmento
+    if inizio < video.duration:
+        clip = video.subclip(inizio, video.duration)
         clip = clip.audio_fadein(0.1).audio_fadeout(0.1)
-        segmenti_attivi.append(clip)
-    # Concatenazione dei segmenti attivi
-    print("concateno i segmenti attivi")
-    video_finale = concatenate_videoclips(segmenti_attivi)
-    video_finale.write_videofile(output_file, codec="h264_nvenc", audio_codec="aac")
-    video_finale.close()
+        active_segments.append(clip)
+    
+    # Concatenazione e salvataggio del video
+    final_video = concatenate_videoclips(active_segments)
+    final_video.write_videofile(output_file, codec="h264_nvenc", audio_codec="aac")
+    final_video.close()
     video.reader.close()
 
+def process_audio(audio, segments, output_file):
+    """Processa un file audio rimuovendo segmenti specifici."""
+    output_audio = AudioSegment.silent(duration=0)  # Inizializza con un segmento vuoto
+    last_end = 0
+
+    for start, stop in segments:
+        if last_end < start:
+            output_audio += audio[last_end:start]  # Aggiungi la parte attiva
+        last_end = stop
+    
+    if last_end < len(audio):
+        output_audio += audio[last_end:]  # Aggiungi l'ultimo segmento
+    
+    # Salva l'audio elaborato
+    output_audio.export(output_file, format="mp3")
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Rileva toni sinusoidali a 1000 Hz in un video.")
-    parser.add_argument("input_video", default="", help="Percorso al file video di input.")
-    parser.add_argument("output_file", help="Percorso al file di output per salvare gli intervalli.")
-    parser.add_argument("freq", default=5000, type=int)
+    parser = argparse.ArgumentParser(description="Rimuove toni e silenzi da video o audio.")
+    parser.add_argument("input_file", help="Percorso al file video o audio di input.")
+    parser.add_argument("output_file", help="Percorso al file di output.")
+    parser.add_argument("freq", default=5000, type=int, help="Frequenza target da rimuovere.")
     args = parser.parse_args()
 
-    main(args.input_video, args.output_file, args.freq)
+    main(args.input_file, args.output_file, args.freq)

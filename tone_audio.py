@@ -43,7 +43,6 @@ def find_tone_segments(audio, target_freq=5000, threshold=0.1, chunk_size=100):
     # Aggiungi l'ultimo segmento se ancora aperto
     if current_start is not None:
         tone_segments.append((current_start, duration_ms))
-
     return tone_segments
 
 def find_silence(audio, silence_len=1250, silence_thresh=-80):
