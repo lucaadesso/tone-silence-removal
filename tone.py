@@ -1,4 +1,4 @@
-import argparse
+import argparse, os
 import cv2
 from pydub import AudioSegment, silence
 from scipy.fftpack import fft
@@ -7,12 +7,12 @@ from moviepy.video.io.VideoFileClip import VideoFileClip
 from moviepy.editor import concatenate_videoclips
 from tqdm import tqdm
 
-def find_tone_segments(audio, target_freq=5000, threshold=0.1, chunk_size=100):
+def find_tone_segments(audio, target_freq=5000, threshold=0.1, chunk_size=5):
     """
     Trova segmenti audio con toni a una frequenza target.
 
     :param audio_path: Path del file audio. No
-    :param target_freq: Frequenza target (in Hz). In Audacity tono da 10000hz su traccia stereo
+    :param target_freq: Frequenza target (in Hz). In Audacity tono da 20000hz su traccia stereo
     :param threshold: Valore soglia per rilevare la presenza della frequenza.
     :param chunk_size: Durata del chunk audio in millisecondi da analizzare.
     :return: Lista di tuple con gli intervalli temporali (start, end) in millisecondi.
@@ -75,13 +75,13 @@ def find_silence(audio, silence_len=1250, silence_thresh=-80):
 
     return dead_time
 
-def main(input_video, output_file, freq):
+def main(input_file, output_file, freq):
     # Estrai l'audio dal video
-    video = VideoFileClip(input_video)
-    audio =  AudioSegment.from_file(input_video)
+    video = VideoFileClip(input_file)
+    audio =  AudioSegment.from_file(input_file)
     print("estratto audio dal video")
 
-    # Trova i segmenti con toni sinusoidali a 1000 Hz
+    # Trova i segmenti con toni sinusoidali a 10000 Hz
     tone_segments = find_tone_segments(audio, target_freq=freq, threshold=1e6)
     silence = [] # find_silence(audio)
     tone_segments += silence
@@ -115,10 +115,14 @@ def main(input_video, output_file, freq):
     video.reader.close()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Rileva toni sinusoidali a 1000 Hz in un video.")
-    parser.add_argument("input_video", default="", help="Percorso al file video di input.")
-    parser.add_argument("output_file", help="Percorso al file di output per salvare gli intervalli.")
-    parser.add_argument("freq", default=5000, type=int)
+    parser = argparse.ArgumentParser(description="Rimuove toni e silenzi da video o audio.")
+    parser.add_argument("input_file", help="Percorso al file video o audio di input.")
+    parser.add_argument("output_file", nargs="?", help="Percorso al file di output.")
+    parser.add_argument("freq", nargs="?", default=5000, type=int, help="Frequenza target da rimuovere.")
     args = parser.parse_args()
 
-    main(args.input_video, args.output_file, args.freq)
+    if args.output_file is None:
+        base, ext = os.path.splitext(args.input_file)
+        args.output_file = f"{base}_clean{ext}"
+
+    main(args.input_file, args.output_file, args.freq)

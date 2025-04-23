@@ -1,4 +1,4 @@
-import argparse
+import argparse, os
 import cv2
 from pydub import AudioSegment, silence
 from scipy.fftpack import fft
@@ -7,7 +7,7 @@ from moviepy.video.io.VideoFileClip import VideoFileClip
 from moviepy.editor import concatenate_videoclips
 from tqdm import tqdm
 
-def find_tone_segments(audio, target_freq=5000, threshold=0.1, chunk_size=100):
+def find_tone_segments(audio, target_freq=5000, threshold=0.1, chunk_size=15):
     """
     Trova segmenti audio con toni a una frequenza target.
 
@@ -71,7 +71,6 @@ def find_silence(audio, silence_len=1250, silence_thresh=-80):
     # Aggiungi tutti i segmenti di silenzio trovati
     for start, stop in sil:
         dead_time.append((start + offset, stop - offset))  # Piccolo offset per evitare problemi
-
     return dead_time
 
 def main(input_file, output_file, freq):
@@ -86,6 +85,7 @@ def main(input_file, output_file, freq):
     
     # Trova i segmenti con toni sinusoidali e silenzi
     tone_segments = find_tone_segments(audio, target_freq=freq, threshold=1e6)
+    print(tone_segments)
     silence_segments = [] # find_silence(audio)
     all_segments = sorted(set(tone_segments + silence_segments))
     
@@ -140,8 +140,12 @@ def process_audio(audio, segments, output_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Rimuove toni e silenzi da video o audio.")
     parser.add_argument("input_file", help="Percorso al file video o audio di input.")
-    parser.add_argument("output_file", help="Percorso al file di output.")
-    parser.add_argument("freq", default=5000, type=int, help="Frequenza target da rimuovere.")
+    parser.add_argument("output_file", nargs="?", help="Percorso al file di output.")
+    parser.add_argument("freq", nargs="?", default=5000, type=int, help="Frequenza target da rimuovere.")
     args = parser.parse_args()
+
+    if args.output_file is None:
+        base, ext = os.path.splitext(args.input_file)
+        args.output_file = f"{base}_clean{ext}"
 
     main(args.input_file, args.output_file, args.freq)
